@@ -17,6 +17,11 @@ public class UserAuthController {
         authService.login(param, request);
     }
 
+    @PostMapping("/logout")
+    public void logout(@RequestBody final AuthParam param, final HttpServletRequest request) {
+        authService.logout(param, request);
+    }
+
     @PostMapping("/gateway-filter")
     public String gatewayFilter(@RequestBody final AuthParam param, final HttpServletRequest request) {
         return authService.gatewayFilter(param, request);

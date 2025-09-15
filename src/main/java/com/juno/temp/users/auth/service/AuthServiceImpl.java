@@ -10,7 +10,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RMapCache;
-import org.redisson.api.RSetCache;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.stereotype.Service;
@@ -31,6 +30,8 @@ public class AuthServiceImpl implements AuthService {
     final String SESSION_PREFIX = "USER:SESSION";
     final String BLACK_LIST_ACCESS_TOKEN_PREFIX = "USER:ACCESS_TOKEN:BLACKLIST";
     final String BLACK_LIST_REFRESH_TOKEN_PREFIX = "USER:REFRESH_TOKEN:BLACKLIST";
+    final String BLACK_REASON_DUPLICATE = "duplicate";
+    final String BLACK_REASON_LOGOUT = "logout";
 
     @Override
     public void login(final AuthParam param, final HttpServletRequest request) {
@@ -50,8 +51,8 @@ public class AuthServiceImpl implements AuthService {
 
         if (isAlreadyLogin(redisSession)) {
             log.info("token black process");
-            RSetCache<String> blackAccessTokenSetCache = redissonClient.getSetCache(BLACK_LIST_ACCESS_TOKEN_PREFIX, StringCodec.INSTANCE);
-            RSetCache<String> blackRefreshTokenSetCache = redissonClient.getSetCache(BLACK_LIST_REFRESH_TOKEN_PREFIX, StringCodec.INSTANCE);
+            RMapCache<String, String> blackAccessTokenMapCache = redissonClient.getMapCache(BLACK_LIST_ACCESS_TOKEN_PREFIX, StringCodec.INSTANCE);
+            RMapCache<String, String> blackRefreshTokenMapCache = redissonClient.getMapCache(BLACK_LIST_REFRESH_TOKEN_PREFIX, StringCodec.INSTANCE);
 
             AuthSession existAuthSession = null;
             try {
@@ -60,8 +61,8 @@ public class AuthServiceImpl implements AuthService {
                 throw new RuntimeException(e);
             }
 
-            blackAccessTokenSetCache.add(existAuthSession.accessToken(), ACCESS_TOKEN_EXPIRE_MINUTE, TimeUnit.MINUTES);
-            blackRefreshTokenSetCache.add(existAuthSession.refreshToken(), REFRESH_TOKEN_EXPIRE_MINUTE, TimeUnit.MINUTES);
+            blackAccessTokenMapCache.put(existAuthSession.accessToken(), BLACK_REASON_DUPLICATE, ACCESS_TOKEN_EXPIRE_MINUTE, TimeUnit.MINUTES);
+            blackRefreshTokenMapCache.put(existAuthSession.refreshToken(), BLACK_REASON_DUPLICATE, REFRESH_TOKEN_EXPIRE_MINUTE, TimeUnit.MINUTES);
         }
 
         String sessionObjectAsString = "";
@@ -73,6 +74,27 @@ public class AuthServiceImpl implements AuthService {
         sessionMapCache.put(sessionKey, sessionObjectAsString);
     }
 
+
+    @Override
+    public void logout(AuthParam param, HttpServletRequest request) {
+        final String findUuid = userRepository.find(param.id());
+        final String sessionKey = "%s:%s".formatted(SESSION_PREFIX, findUuid);
+        RMapCache<String, String> sessionMapCache = redissonClient.getMapCache(SESSION_PREFIX, StringCodec.INSTANCE);
+        String sessionAsString = sessionMapCache.get(sessionKey);
+        AuthSession authSession = null;
+        try {
+            authSession = objectMapper.readValue(sessionAsString, AuthSession.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+        sessionMapCache.remove(sessionKey);
+
+        RMapCache<String, String> blackAccessTokenMapCache = redissonClient.getMapCache(BLACK_LIST_ACCESS_TOKEN_PREFIX, StringCodec.INSTANCE);
+        RMapCache<String, String> blackRefreshTokenMapCache = redissonClient.getMapCache(BLACK_LIST_REFRESH_TOKEN_PREFIX, StringCodec.INSTANCE);
+        blackAccessTokenMapCache.put(authSession.accessToken(), BLACK_REASON_LOGOUT, ACCESS_TOKEN_EXPIRE_MINUTE, TimeUnit.MINUTES);
+        blackRefreshTokenMapCache.put(authSession.refreshToken(), BLACK_REASON_LOGOUT, REFRESH_TOKEN_EXPIRE_MINUTE, TimeUnit.MINUTES);
+    }
+
     private static boolean isAlreadyLogin(Object redisSession) {
         return redisSession != null;
     }
@@ -82,10 +104,11 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = param.token();
         // access token parse logic...
         // black process
-        RSetCache<String> blackAccessTokenSetCache = redissonClient.getSetCache(BLACK_LIST_ACCESS_TOKEN_PREFIX, StringCodec.INSTANCE);
+        RMapCache<String, String> blackAccessTokenMapCache = redissonClient.getMapCache(BLACK_LIST_ACCESS_TOKEN_PREFIX, StringCodec.INSTANCE);
+        blackAccessTokenMapCache.get(accessToken);
 
-        if (blackAccessTokenSetCache.contains(accessToken)) {
-            return "access black list";
+        if (blackAccessTokenMapCache.get(accessToken) != null) {
+            return blackAccessTokenMapCache.get(accessToken);
         }
 
         return "access ok";
@@ -93,13 +116,12 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String refresh(String refreshToken, HttpServletRequest request) {
-
         // access token parse logic...
         // black process
-        RSetCache<String> blackRefreshTokenSetCache = redissonClient.getSetCache(BLACK_LIST_REFRESH_TOKEN_PREFIX, StringCodec.INSTANCE);
+        RMapCache<String, String> blackRefreshTokenMapCache = redissonClient.getMapCache(BLACK_LIST_REFRESH_TOKEN_PREFIX, StringCodec.INSTANCE);
 
-        if (blackRefreshTokenSetCache.contains(refreshToken)) {
-            return "refresh black list";
+        if (blackRefreshTokenMapCache.get(refreshToken) != null) {
+            return blackRefreshTokenMapCache.get(refreshToken);
         }
 
         return "refresh ok";
