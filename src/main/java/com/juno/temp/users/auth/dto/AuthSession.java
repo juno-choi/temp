@@ -15,4 +15,11 @@ public record AuthSession (
             .userAgent(userAgent)
             .build();
     }
+
+    public static AuthSession of(final String accessToken, final String refreshToken) {
+        return AuthSession.builder()
+            .accessToken(accessToken)
+            .refreshToken(refreshToken)
+            .build();
+    }
 }
