@@ -1,8 +1,10 @@
 package com.juno.temp.encoder;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import static org.assertj.core.api.Assertions.*;
 
 class SHA512PasswordEncoderTest {
 
@@ -18,7 +20,7 @@ class SHA512PasswordEncoderTest {
         boolean matches = sha512PasswordEncoder.matches(password, encodedPassword);
 
         //then
-        Assertions.assertThat(matches).isTrue();
+        assertThat(matches).isTrue();
     }
 
     @Test
@@ -36,8 +38,31 @@ class SHA512PasswordEncoderTest {
         boolean matches2 = sha512PasswordEncoder.matches(password, encodedPassword1);
 
         //then
-        Assertions.assertThat(encodedPassword1).isNotEqualTo(encodedPassword2);
-        Assertions.assertThat(matches1).isTrue();
-        Assertions.assertThat(matches2).isTrue();
+        assertThat(encodedPassword1).isNotEqualTo(encodedPassword2);
+        assertThat(matches1).isTrue();
+        assertThat(matches2).isTrue();
+    }
+
+    @Test
+    @DisplayName("BCrypt로 암호화된 데이터와 SHA-512로 암호화된 데이터를 구분해 낸다")
+    void encodeSuccess2() {
+        //given
+        String password = "password123";
+        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        SHA512PasswordEncoder sha512PasswordEncoder = new SHA512PasswordEncoder();
+        String bcryptPrefix = "$2a";
+        String sha512Prefix = "$sha512$";
+
+        String bcryptEncodePassword = bCryptPasswordEncoder.encode(password);
+        String sha512EncodePassword = sha512PasswordEncoder.encode(password);
+
+        //when
+        boolean isBcrypt = bcryptEncodePassword.contains(bcryptPrefix);
+        boolean isSha512 = sha512EncodePassword.contains(sha512Prefix);
+
+        //then
+        assertThat(bcryptEncodePassword).isNotEqualTo(sha512EncodePassword);
+        assertThat(isBcrypt).isTrue();
+        assertThat(isSha512).isTrue();
     }
 }
