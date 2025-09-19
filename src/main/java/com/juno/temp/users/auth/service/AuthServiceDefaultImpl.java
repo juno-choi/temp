@@ -13,6 +13,8 @@ import org.redisson.api.RBucket;
 import org.redisson.api.RSetCache;
 import org.redisson.api.RedissonClient;
 import org.redisson.client.codec.StringCodec;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -25,6 +27,8 @@ public class AuthServiceDefaultImpl implements AuthService {
     private final UserRepository userRepository;
     private final AuthProvider authProvider;
     private final ObjectMapper objectMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final BCryptPasswordEncoder bcryptPasswordEncoder;
 
     private static final long refreshExpirationPeriod = 30 * 60 * 1000;
     private static final String REFRESH_TOKEN_PREFIX = "R-REFRESH-TOKEN:";
