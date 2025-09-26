@@ -12,11 +12,13 @@ import lombok.SneakyThrows;
 import org.redisson.api.RBucket;
 import org.redisson.api.RSetCache;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.codec.ByteArrayCodec;
 import org.redisson.client.codec.StringCodec;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
@@ -35,7 +37,7 @@ public class AuthServiceDefaultImpl implements AuthService {
     private static final String USER_NAME_PREFIX = "R-TOKEN-USERNAME:";
     private static final String REFRESH_TOKEN_BLACK_PREFIX = "R-REFRESH-TOKEN-BLACK";
 
-    @SneakyThrows(JsonProcessingException.class)
+    @SneakyThrows(Exception.class)
     @Override
     public void login(AuthParam param, HttpServletRequest request) {
         final String username = userRepository.find(param.id());
@@ -43,11 +45,11 @@ public class AuthServiceDefaultImpl implements AuthService {
         final String refreshToken = authProvider.getRefreshToken();
 
         // 중복 로그인 체크
-        RBucket<String> usernameBucket = redissonClient.getBucket(USER_NAME_PREFIX + username, StringCodec.INSTANCE);
+        RBucket<byte[]> usernameBucket = redissonClient.getBucket(USER_NAME_PREFIX + username, ByteArrayCodec.INSTANCE);
         if (usernameBucket.get() != null) {
 
-            String userNameBucketAsString = usernameBucket.get();
-            AuthSession authSession = objectMapper.readValue(userNameBucketAsString, AuthSession.class);
+            byte[] userNameBucketAsByte = usernameBucket.get();
+            AuthSession authSession = objectMapper.readValue(userNameBucketAsByte, AuthSession.class);
 
             RSetCache<String> blackSet = redissonClient.getSetCache(REFRESH_TOKEN_BLACK_PREFIX, StringCodec.INSTANCE);
             blackSet.add(authSession.refreshToken(), refreshExpirationPeriod, TimeUnit.SECONDS);
@@ -66,7 +68,7 @@ public class AuthServiceDefaultImpl implements AuthService {
 
         // token-username mapping
         AuthSession authSession = AuthSession.of(accessToken, refreshToken);
-        usernameBucket.set(objectMapper.writeValueAsString(authSession), Duration.ofMillis(refreshExpirationPeriod));
+        usernameBucket.set(objectMapper.writeValueAsBytes(authSession), Duration.ofMillis(refreshExpirationPeriod));
     }
 
     @Override

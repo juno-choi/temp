@@ -32,4 +32,9 @@ public class SecurityConfig {
         final Map<String, PasswordEncoder> encoders = Map.of("bcrypt", bCryptPasswordEncoder, "pbkdf2", pbkdf2PasswordEncoder);
         return new DelegatingPasswordEncoder("pbkdf2", encoders);
     }
+
+    @Bean
+    public BCryptPasswordEncoder bCryptPasswordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 }

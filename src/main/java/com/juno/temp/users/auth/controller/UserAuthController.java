@@ -6,6 +6,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -13,7 +15,7 @@ public class UserAuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public void login(@RequestBody final AuthParam param, final HttpServletRequest request) {
+    public void login(@RequestBody final AuthParam param, final HttpServletRequest request) throws IOException {
         authService.login(param, request);
     }
 
