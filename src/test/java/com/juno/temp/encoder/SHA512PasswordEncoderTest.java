@@ -1,23 +1,33 @@
 package com.juno.temp.encoder;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 
 class SHA512PasswordEncoderTest {
+    final Pbkdf2PasswordEncoder pbkdf2PasswordEncoder = new Pbkdf2PasswordEncoder("", 16, 310_000, Pbkdf2PasswordEncoder.SecretKeyFactoryAlgorithm.PBKDF2WithHmacSHA512);
+    final BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+    final Map<String, PasswordEncoder> encoders = Map.of("v1", bCryptPasswordEncoder, "v2", pbkdf2PasswordEncoder);
+    final DelegatingPasswordEncoder passwordEncoder = new DelegatingPasswordEncoder("v2", encoders);
 
     @Test
     @DisplayName("SHA-512 암호화와 복호화에 성공한다")
     void matchesSuccess1() {
         //given
         String password = "password123";
-        SHA512PasswordEncoder sha512PasswordEncoder = new SHA512PasswordEncoder();
-        String encodedPassword = sha512PasswordEncoder.encode(password);
+        DelegatingPasswordEncoder passwordEncoders = passwordEncoder;
+        String encodedPassword = passwordEncoders.encode(password);
 
         //when
-        boolean matches = sha512PasswordEncoder.matches(password, encodedPassword);
+        boolean matches = passwordEncoders.matches(password, encodedPassword);
 
         //then
         assertThat(matches).isTrue();
@@ -28,7 +38,7 @@ class SHA512PasswordEncoderTest {
     void encodeSuccess1() {
         //given
         String password = "password123";
-        SHA512PasswordEncoder sha512PasswordEncoder = new SHA512PasswordEncoder();
+        Pbkdf2PasswordEncoder sha512PasswordEncoder = new Pbkdf2PasswordEncoder("", 16, 1_000, Pbkdf2PasswordEncoder.SecretKeyFactoryAlgorithm.PBKDF2WithHmacSHA512);
 
         //when
         String encodedPassword1 = sha512PasswordEncoder.encode(password);
@@ -49,20 +59,35 @@ class SHA512PasswordEncoderTest {
         //given
         String password = "password123";
         BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
-        SHA512PasswordEncoder sha512PasswordEncoder = new SHA512PasswordEncoder();
+        PasswordEncoder sha512PasswordEncoder = passwordEncoder;
         String bcryptPrefix = "$2a";
-        String sha512Prefix = "$sha512$";
 
         String bcryptEncodePassword = bCryptPasswordEncoder.encode(password);
         String sha512EncodePassword = sha512PasswordEncoder.encode(password);
 
         //when
         boolean isBcrypt = bcryptEncodePassword.contains(bcryptPrefix);
-        boolean isSha512 = sha512EncodePassword.contains(sha512Prefix);
 
         //then
         assertThat(bcryptEncodePassword).isNotEqualTo(sha512EncodePassword);
         assertThat(isBcrypt).isTrue();
-        assertThat(isSha512).isTrue();
+    }
+
+    @Test
+    @DisplayName("Pbkdf2PasswordEncoder encoding")
+    void pbkdf2PasswordEncoder() {
+        //given
+        String password = "password123";
+        BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        PasswordEncoder sha512PasswordEncoder = passwordEncoder;
+        String bcryptPrefix = "{v1}";
+
+        String bcryptEncodePassword = bcryptPrefix+bCryptPasswordEncoder.encode(password);
+
+        //when
+        boolean matches = passwordEncoder.matches(password, bcryptEncodePassword);
+
+        //then
+        Assertions.assertThat(matches).isTrue();
     }
 }

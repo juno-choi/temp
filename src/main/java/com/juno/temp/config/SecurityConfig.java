@@ -1,13 +1,16 @@
 package com.juno.temp.config;
 
-import com.juno.temp.encoder.SHA512PasswordEncoder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+
+import java.util.Map;
 
 @Configuration
 public class SecurityConfig {
@@ -24,11 +27,9 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new SHA512PasswordEncoder();
-    }
-
-    @Bean("bcryptPasswordEncoder")
-    public BCryptPasswordEncoder bcryptPasswordEncoder() {
-        return new BCryptPasswordEncoder();
+        final Pbkdf2PasswordEncoder pbkdf2PasswordEncoder = new Pbkdf2PasswordEncoder("", 16, 310_000, Pbkdf2PasswordEncoder.SecretKeyFactoryAlgorithm.PBKDF2WithHmacSHA512);
+        final BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+        final Map<String, PasswordEncoder> encoders = Map.of("bcrypt", bCryptPasswordEncoder, "pbkdf2", pbkdf2PasswordEncoder);
+        return new DelegatingPasswordEncoder("pbkdf2", encoders);
     }
 }
